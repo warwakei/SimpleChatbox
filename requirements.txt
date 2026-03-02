@@ -1,0 +1,4 @@
+PyQt5==5.15.9
+requests==2.31.0
+python-osc==1.8.3
+PyInstaller==6.19.0
