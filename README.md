@@ -50,7 +50,9 @@ Simply run `SimpleChatbox.exe`
 ### Step 2: Enable VRChat OSC
 
 1. Open VRChat
-2. Go to Settings → OSC
+2. Go to Wheel → Options → OSC → Turn it on
+<img width="609" height="461" alt="image" src="https://github.com/user-attachments/assets/86e55ea7-5a57-4941-b70c-17dafff1c882" />
+
 3. Make sure OSC is enabled (port 9000)
 
 ### Step 3: Run SimpleChatbox
