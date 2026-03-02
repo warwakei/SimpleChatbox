@@ -1,6 +1,6 @@
 # SimpleChatbox
 
-VRChat chatbox utility that displays currently playing media from your PC. Integrates with MediaEngine to fetch track information and sends it to VRChat via OSC protocol.
+VRChat chatbox utility that displays currently playing media from your PC. Integrates with [warwakei Media Engine](https://github.com/warwakei/MediaEngine) to fetch track information and sends it to VRChat via OSC protocol.
 
 ## Features
 
@@ -16,7 +16,7 @@ VRChat chatbox utility that displays currently playing media from your PC. Integ
 
 - Windows 10 or later
 - VRChat with OSC enabled (port 9000)
-- MediaEngine running on localhost:5000
+- **[warwakei Media Engine](https://github.com/warwakei/MediaEngine)** - Required for fetching media information
 
 ## Installation
 
@@ -36,6 +36,33 @@ python main.py
 ### From Executable
 
 Simply run `SimpleChatbox.exe`
+
+## Quick Start Guide
+
+### Step 1: Install Media Engine
+
+1. Download [warwakei Media Engine](https://github.com/warwakei/MediaEngine)
+2. Run `MediaEngine.exe`
+3. Select option `1` to install
+4. The engine will be installed to `C:\Users\[YourUsername]\AppData\Roaming\warwakei\utility\`
+5. It will automatically start in the background
+
+### Step 2: Enable VRChat OSC
+
+1. Open VRChat
+2. Go to Settings → OSC
+3. Make sure OSC is enabled (port 9000)
+
+### Step 3: Run SimpleChatbox
+
+1. Run `SimpleChatbox.exe` (or `python main.py` if from source)
+2. Wait for connection to MediaEngine (should show "✓ Connected to MediaEngine")
+3. Configure your preferences in the Settings tab
+4. Click "Send to VRChat" or enable "Auto-send"
+
+### Step 4: Enjoy
+
+Your current track will now appear in VRChat chatbox!
 
 ## Configuration
 
