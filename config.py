@@ -6,14 +6,21 @@ class Config:
     def __init__(self, config_file: str = "config.json"):
         self.config_file = Path(config_file)
         self.defaults = {
-            "format": "display",  # display, artist_track, track_artist, track_by_artist, track_only
+            "format": "display",
             "show_status_icon": True,
             "playing_icon": "▶",
             "paused_icon": "⏸",
             "media_engine_url": "http://localhost:5000",
             "vrchat_ip": "127.0.0.1",
             "vrchat_port": 9000,
-            "auto_send_delay": 3000
+            "auto_send_delay": 3000,
+            "show_music_msg": True,
+            "show_sys_msg": False,
+            "sys_msg_separator": " | ",
+            "show_cpu_usage": True,
+            "show_ram_usage": True,
+            "show_cpu_temp": True,
+            "show_gpu_temp": True
         }
         self.data = self.load()
     

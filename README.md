@@ -1,22 +1,25 @@
 # SimpleChatbox
 
-VRChat chatbox utility that displays currently playing media from your PC. Integrates with [warwakei Media Engine](https://github.com/warwakei/MediaEngine) to fetch track information and sends it to VRChat via OSC protocol.
+VRChat chatbox utility that displays currently playing media from your PC and system information. Integrates with [warwakei Media Engine](https://github.com/warwakei/MediaEngine) to fetch track information and sends it to VRChat via OSC protocol.
 
 ## Features
 
 - Real-time display of currently playing media
+- System information display (CPU, RAM, temperatures)
 - Customizable message format (multiple layout options)
 - Custom status icons (playing/paused)
 - Auto-send functionality with configurable delay
 - PyQt5 GUI for easy configuration
 - OSC integration with VRChat
 - Persistent configuration storage
+- Combine music and system info in one message
 
 ## Requirements
 
 - Windows 10 or later
 - VRChat with OSC enabled (port 9000)
 - **[warwakei Media Engine](https://github.com/warwakei/MediaEngine)** - Required for fetching media information
+- Python 3.8+ (for running from source)
 
 ## Installation
 
@@ -68,21 +71,28 @@ Your current track will now appear in VRChat chatbox!
 
 The application stores settings in `config.json`. You can customize:
 
+### Music Settings (MusicMSG Tab)
 - **Message Format**: Choose how track info is displayed
   - Display (from API)
   - Artist - Track
   - Track - Artist
   - Track by Artist
   - Track only
-
 - **Status Icons**: Customize playing/paused indicators
   - Default: ▶ (playing), ⏸ (paused)
 
-- **Auto-send**: Enable automatic sending with custom delay
+### System Settings (SysMSG Tab)
+- **Show System Info**: Enable/disable system information in messages
+- **Message Separator**: Custom separator between music and system info
+- **Display Options**:
+  - CPU Usage (%)
+  - RAM Usage (GB and %)
+  - CPU Temperature (°C)
+  - GPU Temperature (°C)
 
-- **Advanced Settings**:
-  - MediaEngine URL
-  - VRChat IP and Port
+### Advanced Settings
+- MediaEngine URL
+- VRChat IP and Port
 
 ## Usage
 
