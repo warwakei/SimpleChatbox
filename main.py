@@ -3,8 +3,9 @@ import threading
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QSpinBox, QCheckBox,
                              QComboBox, QLineEdit, QTabWidget, QGroupBox, QScrollArea)
-from PyQt5.QtCore import QTimer, pyqtSignal, QObject
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import QTimer, pyqtSignal, QObject, Qt
+from PyQt5.QtGui import QFont, QFontDatabase
+import platform
 
 from media_engine_client import MediaEngineClient
 from vrchat_chatbox import VRChatChatbox
@@ -32,6 +33,7 @@ class SimpleChatboxApp(QMainWindow):
         self.auto_send_enabled = False
         
         self.init_ui()
+        self.apply_dark_theme()
         self.setup_timer()
         
         self.signals.track_updated.connect(self.on_track_updated)
@@ -41,14 +43,22 @@ class SimpleChatboxApp(QMainWindow):
         self.setWindowTitle("SimpleChatbox - VRChat Music Display")
         self.setGeometry(100, 100, 600, 550)
         
+        # Применяем тёмную тему
+        self.apply_dark_theme()
+        
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
         main_layout = QVBoxLayout()
+        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(15, 15, 15, 15)
         
         # Статус подключения
         self.status_label = QLabel("Connecting to MediaEngine...")
-        self.status_label.setFont(QFont("Arial", 10))
+        status_font = QFont("Segoe UI", 10)
+        status_font.setStyleStrategy(QFont.PreferAntialias)
+        self.status_label.setFont(status_font)
+        self.status_label.setStyleSheet("color: #6ba876; font-weight: bold;")
         main_layout.addWidget(self.status_label)
         
         # Автоотправка
@@ -63,20 +73,29 @@ class SimpleChatboxApp(QMainWindow):
         self.delay_spinbox.setMaximum(60000)
         self.delay_spinbox.setValue(self.config.get('auto_send_delay', 3000))
         self.delay_spinbox.setSingleStep(100)
+        self.delay_spinbox.setStyleSheet(self.get_spinbox_style())
         auto_layout.addWidget(self.delay_spinbox)
         auto_layout.addStretch()
         main_layout.addLayout(auto_layout)
         
         # Preview панель
         preview_group = QGroupBox("Preview")
+        preview_group.setStyleSheet(self.get_groupbox_style())
         preview_layout = QVBoxLayout()
+        preview_layout.setSpacing(8)
         
         self.track_label = QLabel("No track playing")
-        self.track_label.setFont(QFont("Arial", 11, QFont.Bold))
+        track_font = QFont("Segoe UI", 12, QFont.Bold)
+        track_font.setStyleStrategy(QFont.PreferAntialias)
+        self.track_label.setFont(track_font)
+        self.track_label.setStyleSheet("color: #34C759; padding: 8px;")
         preview_layout.addWidget(self.track_label)
         
         self.sys_label = QLabel("")
-        self.sys_label.setFont(QFont("Arial", 10))
+        sys_font = QFont("Segoe UI", 10)
+        sys_font.setStyleStrategy(QFont.PreferAntialias)
+        self.sys_label.setFont(sys_font)
+        self.sys_label.setStyleSheet("color: #FF9500; padding: 4px;")
         preview_layout.addWidget(self.sys_label)
         
         preview_group.setLayout(preview_layout)
@@ -84,12 +103,15 @@ class SimpleChatboxApp(QMainWindow):
         
         # Кнопки управления
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
         
         self.send_button = QPushButton("Send to VRChat")
+        self.send_button.setStyleSheet(self.get_button_style("#6ba876"))
         self.send_button.clicked.connect(self.send_to_vrchat)
         button_layout.addWidget(self.send_button)
         
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setStyleSheet(self.get_button_style("#6ba876"))
         self.refresh_button.clicked.connect(self.refresh_track)
         button_layout.addWidget(self.refresh_button)
         
@@ -97,6 +119,7 @@ class SimpleChatboxApp(QMainWindow):
         
         # Табы для настроек
         tabs = QTabWidget()
+        tabs.setMinimumHeight(400)
         
         # Таб 1: Music Message
         music_widget = self.create_music_tab()
@@ -110,20 +133,244 @@ class SimpleChatboxApp(QMainWindow):
         advanced_widget = self.create_advanced_tab()
         tabs.addTab(advanced_widget, "Advanced")
         
+        # Таб 4: About
+        about_widget = self.create_about_tab()
+        tabs.addTab(about_widget, "About")
+        
         main_layout.addWidget(tabs)
         central_widget.setLayout(main_layout)
+    
+    def apply_dark_theme(self):
+        """Применить тёмную тему в старом стиле"""
+        dark_style_stylesheet = """
+            QMainWindow {
+                background-color: #1a1a1a;
+            }
+            QWidget {
+                background-color: #1a1a1a;
+                color: #d0d0d0;
+            }
+            QGroupBox {
+                color: #d0d0d0;
+                border: 2px solid #2d2d2d;
+                border-radius: 4px;
+                margin-top: 12px;
+                padding-top: 12px;
+                background-color: #0f0f0f;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px 0 3px;
+                color: #a0a0a0;
+            }
+            QCheckBox {
+                color: #d0d0d0;
+                spacing: 6px;
+                font-size: 12px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border: 2px solid #444444;
+                background-color: #0a0a0a;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #4a7c59;
+                border: 2px solid #6ba876;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #666666;
+            }
+            QComboBox {
+                background-color: #0a0a0a;
+                color: #d0d0d0;
+                border: 2px solid #444444;
+                border-radius: 2px;
+                padding: 4px 6px;
+                font-weight: normal;
+                font-size: 12px;
+            }
+            QComboBox::drop-down {
+                border: none;
+                background-color: transparent;
+                width: 20px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #0a0a0a;
+                color: #d0d0d0;
+                selection-background-color: #4a7c59;
+                border: 2px solid #444444;
+                border-radius: 2px;
+            }
+            QLineEdit {
+                background-color: #0a0a0a;
+                color: #d0d0d0;
+                border: 2px solid #444444;
+                border-radius: 2px;
+                padding: 4px 6px;
+                font-weight: normal;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #6ba876;
+            }
+            QSpinBox {
+                background-color: #0a0a0a;
+                color: #d0d0d0;
+                border: 2px solid #444444;
+                border-radius: 2px;
+                padding: 4px 6px;
+                font-weight: normal;
+                font-size: 12px;
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                background-color: #2d2d2d;
+                border: 1px solid #444444;
+                width: 18px;
+            }
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+                background-color: #3a3a3a;
+            }
+            QTabWidget::pane {
+                border: 2px solid #2d2d2d;
+                background-color: #1a1a1a;
+                border-radius: 2px;
+            }
+            QTabBar::tab {
+                background-color: #2d2d2d;
+                color: #a0a0a0;
+                padding: 8px 20px;
+                border: 2px solid #444444;
+                border-radius: 2px 2px 0 0;
+                margin-right: 2px;
+                font-weight: normal;
+                font-size: 12px;
+                min-width: 80px;
+            }
+            QTabBar::tab:hover {
+                background-color: #3a3a3a;
+            }
+            QTabBar::tab:selected {
+                background-color: #1a1a1a;
+                color: #6ba876;
+                border-bottom: 3px solid #6ba876;
+            }
+            QLabel {
+                color: #d0d0d0;
+            }
+            QScrollArea {
+                background-color: #1a1a1a;
+                border: 2px solid #2d2d2d;
+            }
+        """
+        self.setStyleSheet(dark_style_stylesheet)
+    
+    def get_button_style(self, color="#6ba876"):
+        """Получить стиль для кнопки в старом стиле"""
+        return f"""
+            QPushButton {{
+                background-color: {color};
+                color: #ffffff;
+                border: 2px solid #444444;
+                border-radius: 2px;
+                padding: 6px 12px;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {self.lighten_color(color)};
+                border: 2px solid #666666;
+            }}
+            QPushButton:pressed {{
+                background-color: {self.darken_color(color)};
+                border: 2px solid #222222;
+            }}
+        """
+    
+    def get_groupbox_style(self):
+        """Получить стиль для группы в старом стиле"""
+        return """
+            QGroupBox {
+                color: #d0d0d0;
+                border: 2px solid #2d2d2d;
+                border-radius: 2px;
+                margin-top: 12px;
+                padding-top: 12px;
+                background-color: #0f0f0f;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px 0 3px;
+                color: #a0a0a0;
+            }
+        """
+    
+    def get_spinbox_style(self):
+        """Получить стиль для spinbox в старом стиле"""
+        return """
+            QSpinBox {
+                background-color: #0a0a0a;
+                color: #d0d0d0;
+                border: 2px solid #444444;
+                border-radius: 2px;
+                padding: 4px 6px;
+                font-weight: normal;
+                font-size: 12px;
+            }
+            QSpinBox:focus {
+                border: 2px solid #6ba876;
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                background-color: #2d2d2d;
+                border: 1px solid #444444;
+                width: 18px;
+            }
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+                background-color: #3a3a3a;
+            }
+        """
+    
+    @staticmethod
+    def lighten_color(color):
+        """Осветлить цвет"""
+        if color == "#6ba876":
+            return "#8bc994"
+        elif color == "#34C759":
+            return "#5FD878"
+        return color
+    
+    @staticmethod
+    def darken_color(color):
+        """Затемнить цвет"""
+        if color == "#6ba876":
+            return "#4a6b54"
+        elif color == "#34C759":
+            return "#1FA940"
+        return color
     
     def create_music_tab(self):
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         layout.addSpacing(20)
         
         # Формат сообщения
         format_group = QGroupBox("Message Format")
+        format_group.setStyleSheet(self.get_groupbox_style())
         format_layout = QVBoxLayout()
         
         format_label = QLabel("Select format:")
+        format_font = QFont("Segoe UI", 10)
+        format_font.setStyleStrategy(QFont.PreferAntialias)
+        format_label.setFont(format_font)
         format_layout.addWidget(format_label)
         
         self.format_combo = QComboBox()
@@ -148,7 +395,9 @@ class SimpleChatboxApp(QMainWindow):
         
         # Иконки статуса
         icons_group = QGroupBox("Status Icons")
+        icons_group.setStyleSheet(self.get_groupbox_style())
         icons_layout = QVBoxLayout()
+        icons_layout.setSpacing(10)
         
         self.show_icon_checkbox = QCheckBox("Show status icon")
         self.show_icon_checkbox.setChecked(self.config.get('show_status_icon', True))
@@ -156,7 +405,9 @@ class SimpleChatboxApp(QMainWindow):
         icons_layout.addWidget(self.show_icon_checkbox)
         
         playing_layout = QHBoxLayout()
-        playing_layout.addWidget(QLabel("Playing icon:"))
+        playing_label = QLabel("Playing icon:")
+        playing_label.setFont(QFont("Segoe UI", 10))
+        playing_layout.addWidget(playing_label)
         self.playing_icon_input = QLineEdit()
         self.playing_icon_input.setText(self.config.get('playing_icon', '▶'))
         self.playing_icon_input.setMaxLength(5)
@@ -167,7 +418,9 @@ class SimpleChatboxApp(QMainWindow):
         icons_layout.addLayout(playing_layout)
         
         paused_layout = QHBoxLayout()
-        paused_layout.addWidget(QLabel("Paused icon:"))
+        paused_label = QLabel("Paused icon:")
+        paused_label.setFont(QFont("Segoe UI", 10))
+        paused_layout.addWidget(paused_label)
         self.paused_icon_input = QLineEdit()
         self.paused_icon_input.setText(self.config.get('paused_icon', '⏸'))
         self.paused_icon_input.setMaxLength(5)
@@ -187,6 +440,8 @@ class SimpleChatboxApp(QMainWindow):
     def create_sys_tab(self):
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Включить/выключить SysMSG
         self.show_sys_checkbox = QCheckBox("Show system info in message")
@@ -198,7 +453,9 @@ class SimpleChatboxApp(QMainWindow):
         
         # Сепаратор
         sep_layout = QHBoxLayout()
-        sep_layout.addWidget(QLabel("Message separator:"))
+        sep_label = QLabel("Message separator:")
+        sep_label.setFont(QFont("Segoe UI", 10))
+        sep_layout.addWidget(sep_label)
         self.separator_input = QLineEdit()
         self.separator_input.setText(self.config.get('sys_msg_separator', ' | '))
         self.separator_input.setMaxLength(10)
@@ -212,7 +469,9 @@ class SimpleChatboxApp(QMainWindow):
         
         # Что показывать
         display_group = QGroupBox("What to Display")
+        display_group.setStyleSheet(self.get_groupbox_style())
         display_layout = QVBoxLayout()
+        display_layout.setSpacing(10)
         
         self.show_cpu_usage_checkbox = QCheckBox("CPU Usage")
         self.show_cpu_usage_checkbox.setChecked(self.config.get('show_cpu_usage', True))
@@ -244,10 +503,14 @@ class SimpleChatboxApp(QMainWindow):
     def create_advanced_tab(self):
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # MediaEngine URL
         media_layout = QHBoxLayout()
-        media_layout.addWidget(QLabel("MediaEngine URL:"))
+        media_label = QLabel("MediaEngine URL:")
+        media_label.setFont(QFont("Segoe UI", 10))
+        media_layout.addWidget(media_label)
         self.media_url_input = QLineEdit()
         self.media_url_input.setText(self.config.get('media_engine_url', 'http://localhost:5000'))
         self.media_url_input.textChanged.connect(self.on_media_url_changed)
@@ -256,7 +519,9 @@ class SimpleChatboxApp(QMainWindow):
         
         # VRChat IP
         ip_layout = QHBoxLayout()
-        ip_layout.addWidget(QLabel("VRChat IP:"))
+        ip_label = QLabel("VRChat IP:")
+        ip_label.setFont(QFont("Segoe UI", 10))
+        ip_layout.addWidget(ip_label)
         self.vrchat_ip_input = QLineEdit()
         self.vrchat_ip_input.setText(self.config.get('vrchat_ip', '127.0.0.1'))
         self.vrchat_ip_input.textChanged.connect(self.on_vrchat_ip_changed)
@@ -265,7 +530,9 @@ class SimpleChatboxApp(QMainWindow):
         
         # VRChat Port
         port_layout = QHBoxLayout()
-        port_layout.addWidget(QLabel("VRChat Port:"))
+        port_label = QLabel("VRChat Port:")
+        port_label.setFont(QFont("Segoe UI", 10))
+        port_layout.addWidget(port_label)
         self.vrchat_port_input = QSpinBox()
         self.vrchat_port_input.setMinimum(1)
         self.vrchat_port_input.setMaximum(65535)
@@ -279,7 +546,122 @@ class SimpleChatboxApp(QMainWindow):
         widget.setLayout(layout)
         return widget
     
-    def setup_timer(self):
+    def create_about_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Логотип/Иконка
+        icon_label = QLabel("🎵")
+        icon_font = QFont("Arial", 40)
+        icon_label.setFont(icon_font)
+        icon_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(icon_label)
+        
+        # Название и версия
+        title_label = QLabel("SimpleChatbox")
+        title_font = QFont("Segoe UI", 16, QFont.Bold)
+        title_font.setStyleStrategy(QFont.PreferAntialias)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #6ba876;")
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+        
+        version_label = QLabel("Version 0.0.1")
+        version_font = QFont("Segoe UI", 10)
+        version_font.setStyleStrategy(QFont.PreferAntialias)
+        version_label.setFont(version_font)
+        version_label.setStyleSheet("color: #8bc994;")
+        version_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(version_label)
+        
+        layout.addSpacing(5)
+        
+        # Описание
+        desc_label = QLabel("VRChat Music Display Utility")
+        desc_font = QFont("Segoe UI", 9)
+        desc_font.setStyleStrategy(QFont.PreferAntialias)
+        desc_label.setFont(desc_font)
+        desc_label.setStyleSheet("color: #a0a0a0;")
+        desc_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(desc_label)
+        
+        layout.addSpacing(10)
+        
+        # Автор
+        author_group = QGroupBox("Developer")
+        author_group.setStyleSheet(self.get_groupbox_style())
+        author_layout = QVBoxLayout()
+        author_layout.setSpacing(4)
+        author_layout.setContentsMargins(8, 8, 8, 8)
+        
+        author_name = QLabel("warwakei")
+        author_font = QFont("Segoe UI", 10, QFont.Bold)
+        author_font.setStyleStrategy(QFont.PreferAntialias)
+        author_name.setFont(author_font)
+        author_name.setStyleSheet("color: #6ba876;")
+        author_layout.addWidget(author_name)
+        
+        author_group.setLayout(author_layout)
+        layout.addWidget(author_group)
+        
+        # Ссылки
+        links_group = QGroupBox("Resources")
+        links_group.setStyleSheet(self.get_groupbox_style())
+        links_layout = QVBoxLayout()
+        links_layout.setSpacing(6)
+        links_layout.setContentsMargins(8, 8, 8, 8)
+        
+        links = [
+            ("GitHub Profile", "https://github.com/warwakei"),
+            ("MediaEngine", "https://github.com/warwakei/MediaEngine"),
+            ("SimpleChatbox", "https://github.com/warwakei/SimpleChatbox")
+        ]
+        
+        for link_name, link_url in links:
+            link_button = QPushButton(f"→ {link_name}")
+            link_button.setStyleSheet(self.get_link_button_style())
+            link_button.setCursor(Qt.PointingHandCursor)
+            link_button.setMaximumHeight(28)
+            link_button.clicked.connect(lambda checked, url=link_url: self.open_link(url))
+            links_layout.addWidget(link_button)
+        
+        links_group.setLayout(links_layout)
+        layout.addWidget(links_group)
+        
+        layout.addStretch()
+        widget.setLayout(layout)
+        return widget
+    
+    def open_link(self, url):
+        """Открыть ссылку в браузере"""
+        import webbrowser
+        webbrowser.open(url)
+    
+    def get_link_button_style(self):
+        """Получить стиль для кнопки ссылки в старом стиле"""
+        return """
+            QPushButton {
+                background-color: #0a0a0a;
+                color: #6ba876;
+                border: 2px solid #444444;
+                border-radius: 2px;
+                padding: 8px 12px;
+                font-weight: normal;
+                font-size: 12px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #1a1a1a;
+                border: 2px solid #666666;
+            }
+            QPushButton:pressed {
+                background-color: #0a0a0a;
+                border: 2px solid #222222;
+            }
+        """
+    
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_connection)
         self.timer.start(1000)
@@ -424,6 +806,12 @@ class SimpleChatboxApp(QMainWindow):
         port = self.vrchat_port_input.value()
         self.config.set('vrchat_port', port)
         self.vrchat = VRChatChatbox(ip=self.config.get('vrchat_ip'), port=port)
+    
+    def setup_timer(self):
+        """Настройка таймера для обновления информации"""
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.refresh_track)
+        self.timer.start(1000)  # Обновление каждую секунду
 
 
 def main():

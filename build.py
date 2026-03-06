@@ -1,14 +1,18 @@
-import PyInstaller.__main__
+import subprocess
 import sys
+import os
 
-PyInstaller.__main__.run([
-    'main.py',
+# Собрать с PyInstaller
+result = subprocess.run([
+    sys.executable, '-m', 'PyInstaller',
     '--onefile',
     '--windowed',
     '--name=SimpleChatbox',
-    '--icon=NONE',
     '--distpath=./dist',
     '--workpath=./build',
     '--specpath=./build',
-])
+    'main.py'
+], cwd=os.path.dirname(os.path.abspath(__file__)))
+
+sys.exit(result.returncode)
 
