@@ -1,6 +1,6 @@
 # SimpleChatbox
-(WARNING: better use commit 275299f instead of one maden on 08.03.2026 for developing.)
-VRChat chatbox utility that displays currently playing media from your PC and system information. 
+(WARNING: better use commit 275299f instead of one maden on 08.03.2026 for developing.)                                           
+                                                                                                                                                                                                                        VRChat chatbox utility that displays currently playing media from your PC and system information. 
 Integrates with [warwakei Media Engine](https://github.com/warwakei/MediaEngine) to fetch track information and sends it to VRChat via OSC protocol.
 
 
