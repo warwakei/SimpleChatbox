@@ -44,8 +44,6 @@ result = subprocess.run([
     '--distpath=./dist',
     '--workpath=./build',
     '--specpath=./build',
-    '--collect-all=PyQt5',
-    '--hidden-import=PyQt5.sip',
     'main.py'
 ])
 

@@ -29,6 +29,7 @@ class SimpleChatboxApp:
         self.system_info = SystemInfo()
         self.current_track = None
         self.auto_send_enabled = False
+        self.last_send_time: float = 0
         
         self.setup_styles()
         self.create_ui()
@@ -782,6 +783,19 @@ to fetch track information and system stats."""
                 separator = self.config.get('sys_msg_separator', ' | ')
                 message = f"{message}{separator}{sys_msg}"
             
+            if self.show_status_var.get():
+                status_msg = self.status_msg_var.get()
+                if status_msg:
+                    sep_before = self.config.get('status_sep_before', ' | ')
+                    sep_after = self.config.get('status_sep_after', ' | ')
+                    message = f"{message}{sep_before}{status_msg}{sep_after}"
+            
+            if self.show_time_var.get():
+                time_msg = self._get_time_string()
+                sep_before = self.config.get('time_sep_before', ' | ')
+                sep_after = self.config.get('time_sep_after', ' | ')
+                message = f"{message}{sep_before}{time_msg}{sep_after}"
+            
             if self.vrchat.send_message(message):
                 self.status_label.config(text="✓ Sent to VRChat", fg=self.accent)
             else:
@@ -793,10 +807,17 @@ to fetch track information and system stats."""
     
     def auto_send_track(self):
         """Автоматически отправить трек"""
+        import time
         if self.auto_send_enabled:
-            self.refresh_track()
-            if self.current_track:
-                self.send_to_vrchat()
+            current_time = time.time()
+            delay_ms = int(self.delay_spinbox.get())
+            delay_sec = delay_ms / 1000.0
+            
+            if current_time - self.last_send_time >= delay_sec:
+                self.refresh_track()
+                if self.current_track:
+                    self.send_to_vrchat()
+                    self.last_send_time = current_time
     
     def on_format_changed(self):
         self.config.set('format', self.format_var.get())
