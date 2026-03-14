@@ -1,11 +1,6 @@
-import sys
+import tkinter as tk
+from tkinter import ttk
 import threading
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QPushButton, QSpinBox, QCheckBox,
-                             QComboBox, QLineEdit, QTabWidget, QGroupBox, QScrollArea)
-from PyQt5.QtCore import QTimer, pyqtSignal, QObject, Qt
-from PyQt5.QtGui import QFont, QFontDatabase
-import platform
 
 from media_engine_client import MediaEngineClient
 from vrchat_chatbox import VRChatChatbox
@@ -13,14 +8,18 @@ from system_info import SystemInfo
 from config import Config
 
 
-class UpdateSignals(QObject):
-    track_updated = pyqtSignal(dict)
-    status_changed = pyqtSignal(str)
-
-
-class SimpleChatboxApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
+class SimpleChatboxApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("SimpleChatbox")
+        self.root.geometry("650x850")
+        self.root.resizable(False, False)
+        self.root.configure(bg="#0f0f0f")
+        
+        # Аутлайн окна с градиентом
+        self.root.attributes('-alpha', 0.99)
+        self.root.overrideredirect(False)
+        
         self.config = Config()
         self.media_client = MediaEngineClient()
         self.vrchat = VRChatChatbox(
@@ -28,590 +27,591 @@ class SimpleChatboxApp(QMainWindow):
             port=self.config.get('vrchat_port')
         )
         self.system_info = SystemInfo()
-        self.signals = UpdateSignals()
         self.current_track = None
         self.auto_send_enabled = False
         
-        self.init_ui()
-        self.apply_dark_theme()
-        self.setup_timer()
-        
-        self.signals.track_updated.connect(self.on_track_updated)
-        self.signals.status_changed.connect(self.on_status_changed)
+        self.setup_styles()
+        self.create_ui()
+        self.setup_timers()
+        self.check_connection()
     
-    def init_ui(self):
-        self.setWindowTitle("SimpleChatbox - VRChat Music Display")
-        self.setGeometry(100, 100, 600, 550)
+    def create_gradient_line(self, parent, height: int = 2) -> tk.Frame:
+        """Создать линию с градиентом от accent к accent_light"""
+        frame = tk.Frame(parent, height=height, bg=self.bg_primary)
+        frame.pack(fill=tk.X)
+        frame.pack_propagate(False)
         
-        # Применяем тёмную тему
-        self.apply_dark_theme()
+        canvas = tk.Canvas(frame, height=height, bg=self.bg_primary, highlightthickness=0, bd=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
         
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        width = 600
+        steps = 50
+        for i in range(steps):
+            ratio = i / steps
+            r1, g1, b1 = int(0xb8), int(0x95), int(0x6a)
+            r2, g2, b2 = int(0xd4), int(0xc5), int(0xa9)
+            r = int(r1 + (r2 - r1) * ratio)
+            g = int(g1 + (g2 - g1) * ratio)
+            b = int(b1 + (b2 - b1) * ratio)
+            color = f"#{r:02x}{g:02x}{b:02x}"
+            x = (width / steps) * i
+            canvas.create_line(x, 0, x + (width / steps), height, fill=color, width=2)
         
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(12)
-        main_layout.setContentsMargins(15, 15, 15, 15)
+        return frame
+    
+    def setup_styles(self):
         
-        # Статус подключения
-        self.status_label = QLabel("Connecting to MediaEngine...")
-        status_font = QFont("Segoe UI", 10)
-        status_font.setStyleStrategy(QFont.PreferAntialias)
-        self.status_label.setFont(status_font)
-        self.status_label.setStyleSheet("color: #6ba876; font-weight: bold;")
-        main_layout.addWidget(self.status_label)
+        self.bg_primary = "#0f0f0f"
+        self.bg_secondary = "#1a1a1a"
+        self.bg_tertiary = "#252525"
+        self.accent = "#b8956a"
+        self.accent_light = "#d4c5a9"
+        self.text_primary = "#e8e8e8"
+        self.text_secondary = "#a8a8a8"
+        self.border = "#b8956a"
+        
+        self.root.configure(bg=self.bg_primary)
+        
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        style.configure("TFrame", background=self.bg_primary, relief="flat", borderwidth=0)
+        style.configure("TLabel", background=self.bg_primary, foreground=self.text_primary, font=("Consolas", 9))
+        style.configure("TButton", background=self.bg_secondary, foreground=self.text_primary, font=("Consolas", 9), relief="flat", padding=8, borderwidth=0)
+        style.map("TButton", background=[("active", self.bg_tertiary)], foreground=[("active", self.accent)], relief=[("pressed", "flat")])
+        style.configure("TCheckbutton", background=self.bg_primary, foreground=self.text_primary, font=("Consolas", 9), focuscolor="none")
+        style.map("TCheckbutton", background=[("active", self.bg_primary)], foreground=[("active", self.text_primary)])
+        style.configure("TRadiobutton", background=self.bg_primary, foreground=self.text_primary, font=("Consolas", 9), focuscolor="none")
+        style.map("TRadiobutton", background=[("active", self.bg_primary)], foreground=[("active", self.text_primary)])
+        style.configure("TEntry", fieldbackground=self.bg_secondary, background=self.bg_secondary, foreground=self.text_primary, font=("Consolas", 9), relief="flat", borderwidth=2, fieldrelief="flat", insertcolor=self.accent)
+        style.configure("TSpinbox", fieldbackground=self.bg_secondary, background=self.bg_secondary, foreground=self.text_primary, font=("Consolas", 9), relief="flat", borderwidth=2, fieldrelief="flat", insertcolor=self.accent)
+        style.configure("TNotebook", background=self.bg_primary, borderwidth=0)
+        style.configure("TNotebook.Tab", background=self.bg_secondary, foreground=self.text_secondary, font=("Consolas", 8), padding=[8, 4], borderwidth=0)
+        style.map("TNotebook.Tab", background=[("selected", self.bg_primary)], foreground=[("selected", self.accent)])
+        style.configure("TLabelframe", background=self.bg_primary, foreground=self.text_primary, font=("Consolas", 9, "bold"), borderwidth=2, relief="flat")
+        style.configure("TLabelframe.Label", background=self.bg_primary, foreground=self.accent, font=("Consolas", 9, "bold"))
+    
+    def create_ui(self):
+        """Создать основной интерфейс"""
+        main_frame = tk.Frame(self.root, bg=self.bg_primary)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
         
         # Автоотправка
-        auto_layout = QHBoxLayout()
-        self.auto_send_checkbox = QCheckBox("Auto-send every (ms):")
-        self.auto_send_checkbox.setChecked(False)
-        self.auto_send_checkbox.stateChanged.connect(self.toggle_auto_send)
-        auto_layout.addWidget(self.auto_send_checkbox)
+        auto_frame = tk.Frame(main_frame, bg=self.bg_primary, height=30)
+        auto_frame.pack(fill=tk.X, padx=12, pady=(8, 0))
+        auto_frame.pack_propagate(False)
         
-        self.delay_spinbox = QSpinBox()
-        self.delay_spinbox.setMinimum(100)
-        self.delay_spinbox.setMaximum(60000)
-        self.delay_spinbox.setValue(self.config.get('auto_send_delay', 3000))
-        self.delay_spinbox.setSingleStep(100)
-        self.delay_spinbox.setStyleSheet(self.get_spinbox_style())
-        auto_layout.addWidget(self.delay_spinbox)
-        auto_layout.addStretch()
-        main_layout.addLayout(auto_layout)
+        self.auto_send_var = tk.BooleanVar()
+        auto_check = ttk.Checkbutton(auto_frame, text="Auto-send every (ms):", 
+                                     variable=self.auto_send_var, 
+                                     command=self.toggle_auto_send)
+        auto_check.pack(side=tk.LEFT, anchor=tk.W)
         
-        # Preview панель
-        preview_group = QGroupBox("Preview")
-        preview_group.setStyleSheet(self.get_groupbox_style())
-        preview_layout = QVBoxLayout()
-        preview_layout.setSpacing(8)
+        self.delay_spinbox = ttk.Spinbox(auto_frame, from_=100, to=60000, width=8, justify=tk.CENTER)
+        self.delay_spinbox.set(self.config.get('auto_send_delay', 3000))
+        self.delay_spinbox.pack(side=tk.LEFT, padx=(8, 0))
         
-        self.track_label = QLabel("No track playing")
-        track_font = QFont("Segoe UI", 12, QFont.Bold)
-        track_font.setStyleStrategy(QFont.PreferAntialias)
-        self.track_label.setFont(track_font)
-        self.track_label.setStyleSheet("color: #34C759; padding: 8px;")
-        preview_layout.addWidget(self.track_label)
+        # Preview панель с толстым золотым аутлайном
+        preview_frame = tk.Frame(main_frame, bg=self.bg_primary, relief=tk.FLAT, bd=0)
+        preview_frame.pack(fill=tk.BOTH, expand=False, padx=12, pady=(12, 0))
         
-        self.sys_label = QLabel("")
-        sys_font = QFont("Segoe UI", 10)
-        sys_font.setStyleStrategy(QFont.PreferAntialias)
-        self.sys_label.setFont(sys_font)
-        self.sys_label.setStyleSheet("color: #FF9500; padding: 4px;")
-        preview_layout.addWidget(self.sys_label)
+        preview_border = tk.Frame(preview_frame, bg=self.border, height=3)
+        preview_border.pack(fill=tk.X)
+        self.create_gradient_line(preview_frame, 3)
         
-        preview_group.setLayout(preview_layout)
-        main_layout.addWidget(preview_group)
+        preview_label = tk.Label(preview_frame, text="Preview", fg=self.accent, bg=self.bg_primary, 
+                                font=("Consolas", 10, "bold"), padx=10, pady=8)
+        preview_label.pack(anchor=tk.W)
+        
+        content_frame = tk.Frame(preview_frame, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+        
+        inner_content = tk.Frame(content_frame, bg=self.bg_secondary)
+        inner_content.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        
+        self.track_label = tk.Label(inner_content, text="No track playing", 
+                                    fg=self.accent, bg=self.bg_secondary, 
+                                    font=("Consolas", 10), wraplength=550, justify=tk.CENTER)
+        self.track_label.pack(fill=tk.X, pady=(0, 8), expand=True)
+        
+        self.sys_label = tk.Label(inner_content, text="", fg=self.accent_light, bg=self.bg_secondary,
+                                 font=("Consolas", 8), wraplength=550, justify=tk.CENTER)
+        self.sys_label.pack(fill=tk.X, expand=True)
+        
+        preview_border_bottom = tk.Frame(preview_frame, bg=self.border, height=2)
+        preview_border_bottom.pack(fill=tk.X)
         
         # Кнопки управления
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
+        button_frame = tk.Frame(main_frame, bg=self.bg_primary, height=40)
+        button_frame.pack(fill=tk.X, padx=12, pady=(8, 0))
+        button_frame.pack_propagate(False)
         
-        self.send_button = QPushButton("Send to VRChat")
-        self.send_button.setStyleSheet(self.get_button_style("#6ba876"))
-        self.send_button.clicked.connect(self.send_to_vrchat)
-        button_layout.addWidget(self.send_button)
+        send_btn = ttk.Button(button_frame, text="Send to VRChat", command=self.send_to_vrchat)
+        send_btn.pack(side=tk.LEFT, padx=(0, 8))
         
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setStyleSheet(self.get_button_style("#6ba876"))
-        self.refresh_button.clicked.connect(self.refresh_track)
-        button_layout.addWidget(self.refresh_button)
-        
-        main_layout.addLayout(button_layout)
+        refresh_btn = ttk.Button(button_frame, text="Refresh", command=self.refresh_track)
+        refresh_btn.pack(side=tk.LEFT)
         
         # Табы для настроек
-        tabs = QTabWidget()
-        tabs.setMinimumHeight(400)
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=0, pady=(8, 0))
         
-        # Таб 1: Music Message
-        music_widget = self.create_music_tab()
-        tabs.addTab(music_widget, "MusicMSG")
+        music_tab = tk.Frame(notebook, bg=self.bg_primary)
+        notebook.add(music_tab, text="MusicMSG")
+        self.create_music_tab(music_tab)
         
-        # Таб 2: System Message
-        sys_widget = self.create_sys_tab()
-        tabs.addTab(sys_widget, "SysMSG")
+        status_tab = tk.Frame(notebook, bg=self.bg_primary)
+        notebook.add(status_tab, text="StatusMSG")
+        self.create_status_tab(status_tab)
         
-        # Таб 3: Advanced
-        advanced_widget = self.create_advanced_tab()
-        tabs.addTab(advanced_widget, "Advanced")
+        time_tab = tk.Frame(notebook, bg=self.bg_primary)
+        notebook.add(time_tab, text="TimeMSG")
+        self.create_time_tab(time_tab)
         
-        # Таб 4: About
-        about_widget = self.create_about_tab()
-        tabs.addTab(about_widget, "About")
+        sys_tab = tk.Frame(notebook, bg=self.bg_primary)
+        notebook.add(sys_tab, text="SysMSG")
+        self.create_sys_tab(sys_tab)
         
-        main_layout.addWidget(tabs)
-        central_widget.setLayout(main_layout)
+        advanced_tab = tk.Frame(notebook, bg=self.bg_primary)
+        notebook.add(advanced_tab, text="CFG")
+        self.create_advanced_tab(advanced_tab)
+        
+        about_tab = tk.Frame(notebook, bg=self.bg_primary)
+        notebook.add(about_tab, text="About")
+        self.create_about_tab(about_tab)
     
-    def apply_dark_theme(self):
-        """Применить тёмную тему в старом стиле"""
-        dark_style_stylesheet = """
-            QMainWindow {
-                background-color: #1a1a1a;
-            }
-            QWidget {
-                background-color: #1a1a1a;
-                color: #d0d0d0;
-            }
-            QGroupBox {
-                color: #d0d0d0;
-                border: 2px solid #2d2d2d;
-                border-radius: 4px;
-                margin-top: 12px;
-                padding-top: 12px;
-                background-color: #0f0f0f;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
-                color: #a0a0a0;
-            }
-            QCheckBox {
-                color: #d0d0d0;
-                spacing: 6px;
-                font-size: 12px;
-            }
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-                border: 2px solid #444444;
-                background-color: #0a0a0a;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #4a7c59;
-                border: 2px solid #6ba876;
-            }
-            QCheckBox::indicator:hover {
-                border: 2px solid #666666;
-            }
-            QComboBox {
-                background-color: #0a0a0a;
-                color: #d0d0d0;
-                border: 2px solid #444444;
-                border-radius: 2px;
-                padding: 4px 6px;
-                font-weight: normal;
-                font-size: 12px;
-            }
-            QComboBox::drop-down {
-                border: none;
-                background-color: transparent;
-                width: 20px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #0a0a0a;
-                color: #d0d0d0;
-                selection-background-color: #4a7c59;
-                border: 2px solid #444444;
-                border-radius: 2px;
-            }
-            QLineEdit {
-                background-color: #0a0a0a;
-                color: #d0d0d0;
-                border: 2px solid #444444;
-                border-radius: 2px;
-                padding: 4px 6px;
-                font-weight: normal;
-                font-size: 12px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #6ba876;
-            }
-            QSpinBox {
-                background-color: #0a0a0a;
-                color: #d0d0d0;
-                border: 2px solid #444444;
-                border-radius: 2px;
-                padding: 4px 6px;
-                font-weight: normal;
-                font-size: 12px;
-            }
-            QSpinBox::up-button, QSpinBox::down-button {
-                background-color: #2d2d2d;
-                border: 1px solid #444444;
-                width: 18px;
-            }
-            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-                background-color: #3a3a3a;
-            }
-            QTabWidget::pane {
-                border: 2px solid #2d2d2d;
-                background-color: #1a1a1a;
-                border-radius: 2px;
-            }
-            QTabBar::tab {
-                background-color: #2d2d2d;
-                color: #a0a0a0;
-                padding: 8px 20px;
-                border: 2px solid #444444;
-                border-radius: 2px 2px 0 0;
-                margin-right: 2px;
-                font-weight: normal;
-                font-size: 12px;
-                min-width: 80px;
-            }
-            QTabBar::tab:hover {
-                background-color: #3a3a3a;
-            }
-            QTabBar::tab:selected {
-                background-color: #1a1a1a;
-                color: #6ba876;
-                border-bottom: 3px solid #6ba876;
-            }
-            QLabel {
-                color: #d0d0d0;
-            }
-            QScrollArea {
-                background-color: #1a1a1a;
-                border: 2px solid #2d2d2d;
-            }
-        """
-        self.setStyleSheet(dark_style_stylesheet)
+    def create_scrollable_tab(self, parent):
+        """Создать прокручиваемый таб"""
+        canvas = tk.Canvas(parent, bg=self.bg_primary, highlightthickness=0, bd=0)
+        scrollable_frame = tk.Frame(canvas, bg=self.bg_primary)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=lambda *args: None, bg=self.bg_primary, bd=0, highlightthickness=0)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        
+        return scrollable_frame
     
-    def get_button_style(self, color="#6ba876"):
-        """Получить стиль для кнопки в старом стиле"""
-        return f"""
-            QPushButton {{
-                background-color: {color};
-                color: #ffffff;
-                border: 2px solid #444444;
-                border-radius: 2px;
-                padding: 6px 12px;
-                font-weight: bold;
-                font-size: 12px;
-            }}
-            QPushButton:hover {{
-                background-color: {self.lighten_color(color)};
-                border: 2px solid #666666;
-            }}
-            QPushButton:pressed {{
-                background-color: {self.darken_color(color)};
-                border: 2px solid #222222;
-            }}
-        """
+    def create_music_tab(self, parent):
+        """Таб для настроек музыки"""
+        scrollable_frame = self.create_scrollable_tab(parent)
+        
+        frame_inner = tk.Frame(scrollable_frame, bg=self.bg_primary)
+        frame_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        
+        # Статус подключения
+        status_frame = tk.Frame(frame_inner, bg=self.bg_primary, height=30)
+        status_frame.pack(fill=tk.X, pady=(0, 12))
+        status_frame.pack_propagate(False)
+        
+        self.status_label = tk.Label(status_frame, text="Connecting to MediaEngine...", 
+                                     fg=self.accent, bg=self.bg_primary, font=("Consolas", 9, "bold"), wraplength=300)
+        self.status_label.pack(side=tk.LEFT, anchor=tk.W)
+        
+        format_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        format_frame.pack(fill=tk.X, pady=(0, 12))
+        
+        format_border = tk.Frame(format_frame, bg=self.border, height=2)
+
+        
+        format_border.pack(fill=tk.X)
+
+        
+        self.create_gradient_line(format_frame, 2)
+        self.create_gradient_line(format_frame, 2)
+        
+        format_label = tk.Label(format_frame, text="Message Format", fg=self.accent, bg=self.bg_secondary, 
+                               font=("Consolas", 9, "bold"), padx=10, pady=6)
+        format_label.pack(anchor=tk.W)
+        
+        format_content = tk.Frame(format_frame, bg=self.bg_secondary)
+        format_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        ttk.Label(format_content, text="Select format:").pack(anchor=tk.W, pady=(0, 6))
+        
+        self.format_var = tk.StringVar(value=self.config.get('format', 'display'))
+        formats = [
+            ("Display (from API)", "display"),
+            ("Artist - Track", "artist_track"),
+            ("Track - Artist", "track_artist"),
+            ("Track by Artist", "track_by_artist"),
+            ("Track only", "track_only"),
+        ]
+        
+        for text, value in formats:
+            ttk.Radiobutton(format_content, text=text, variable=self.format_var, 
+                           value=value, command=self.on_format_changed).pack(anchor=tk.W, pady=2)
+        
+        icons_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        icons_frame.pack(fill=tk.X)
+        
+        icons_border = tk.Frame(icons_frame, bg=self.border, height=2)
+
+        
+        icons_border.pack(fill=tk.X)
+
+        
+        self.create_gradient_line(icons_frame, 2)
+
+        
+        self.create_gradient_line(icons_frame, 2)
+        self.create_gradient_line(icons_frame, 2)
+        
+        icons_label = tk.Label(icons_frame, text="Status Icons", fg=self.accent, bg=self.bg_secondary, 
+                              font=("Consolas", 9, "bold"), padx=10, pady=6)
+        icons_label.pack(anchor=tk.W)
+        
+        icons_content = tk.Frame(icons_frame, bg=self.bg_secondary)
+        icons_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        self.show_icon_var = tk.BooleanVar(value=self.config.get('show_status_icon', True))
+        ttk.Checkbutton(icons_content, text="Show status icon", variable=self.show_icon_var,
+                       command=self.on_show_icon_changed).pack(anchor=tk.W, pady=(0, 8))
+        
+        playing_frame = tk.Frame(icons_content, bg=self.bg_secondary)
+        playing_frame.pack(fill=tk.X, pady=4)
+        ttk.Label(playing_frame, text="Playing icon:").pack(side=tk.LEFT)
+        self.playing_icon_var = tk.StringVar(value=self.config.get('playing_icon', '▶'))
+        ttk.Entry(playing_frame, textvariable=self.playing_icon_var, width=5).pack(side=tk.LEFT, padx=(8, 0))
+        self.playing_icon_var.trace('w', lambda *args: self.on_playing_icon_changed())
+        
+        paused_frame = tk.Frame(icons_content, bg=self.bg_secondary)
+        paused_frame.pack(fill=tk.X, pady=4)
+        ttk.Label(paused_frame, text="Paused icon:").pack(side=tk.LEFT)
+        self.paused_icon_var = tk.StringVar(value=self.config.get('paused_icon', '⏸'))
+        ttk.Entry(paused_frame, textvariable=self.paused_icon_var, width=5).pack(side=tk.LEFT, padx=(8, 0))
+        self.paused_icon_var.trace('w', lambda *args: self.on_paused_icon_changed())
     
-    def get_groupbox_style(self):
-        """Получить стиль для группы в старом стиле"""
-        return """
-            QGroupBox {
-                color: #d0d0d0;
-                border: 2px solid #2d2d2d;
-                border-radius: 2px;
-                margin-top: 12px;
-                padding-top: 12px;
-                background-color: #0f0f0f;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
-                color: #a0a0a0;
-            }
-        """
+    def create_status_tab(self, parent):
+        """Таб для пользовательского статус сообщения"""
+        scrollable_frame = self.create_scrollable_tab(parent)
+        
+        frame_inner = tk.Frame(scrollable_frame, bg=self.bg_primary)
+        frame_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        
+        self.show_status_var = tk.BooleanVar(value=self.config.get('show_status_msg', False))
+        ttk.Checkbutton(frame_inner, text="Show custom status message", variable=self.show_status_var,
+                       command=self.on_show_status_changed).pack(anchor=tk.W, pady=(0, 12))
+        
+        msg_frame = tk.Frame(frame_inner, bg=self.bg_primary)
+        msg_frame.pack(fill=tk.X, pady=(0, 12))
+        ttk.Label(msg_frame, text="Status message:").pack(side=tk.LEFT)
+        self.status_msg_var = tk.StringVar(value=self.config.get('status_msg', ''))
+        ttk.Entry(msg_frame, textvariable=self.status_msg_var, width=40).pack(side=tk.LEFT, padx=(8, 0), fill=tk.X, expand=True)
+        self.status_msg_var.trace('w', lambda *args: self.on_status_msg_changed())
+        
+        position_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        position_frame.pack(fill=tk.X, pady=(0, 12))
+        
+        position_border = tk.Frame(position_frame, bg=self.border, height=2)
+
+        
+        position_border.pack(fill=tk.X)
+
+        
+        self.create_gradient_line(position_frame, 2)
+
+        
+        self.create_gradient_line(position_frame, 2)
+        
+        position_label = tk.Label(position_frame, text="Message Position", fg=self.accent, bg=self.bg_secondary, 
+                                 font=("Consolas", 9, "bold"), padx=10, pady=6)
+        position_label.pack(anchor=tk.W)
+        
+        position_content = tk.Frame(position_frame, bg=self.bg_secondary)
+        position_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        self.status_position_var = tk.StringVar(value=self.config.get('status_position', 'after_music'))
+        positions = [
+            ("Before everything", "before_all"),
+            ("After MusicMSG", "after_music"),
+            ("After SysMSG", "after_sys"),
+            ("At the end", "at_end"),
+        ]
+        
+        for text, value in positions:
+            ttk.Radiobutton(position_content, text=text, variable=self.status_position_var, 
+                           value=value, command=self.on_status_position_changed).pack(anchor=tk.W, pady=2)
+        
+        conditions_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        conditions_frame.pack(fill=tk.X, pady=(12, 0))
+        
+        conditions_border = tk.Frame(conditions_frame, bg=self.border, height=2)
+
+        
+        conditions_border.pack(fill=tk.X)
+
+        
+        self.create_gradient_line(conditions_frame, 2)
+
+        
+        self.create_gradient_line(conditions_frame, 2)
+        
+        conditions_label = tk.Label(conditions_frame, text="Show only if", fg=self.accent, bg=self.bg_secondary, 
+                                   font=("Consolas", 9, "bold"), padx=10, pady=6)
+        conditions_label.pack(anchor=tk.W)
+        
+        conditions_content = tk.Frame(conditions_frame, bg=self.bg_secondary)
+        conditions_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        self.status_if_music_var = tk.BooleanVar(value=self.config.get('status_if_music', True))
+        ttk.Checkbutton(conditions_content, text="MusicMSG is enabled", variable=self.status_if_music_var,
+                       command=self.on_status_condition_changed).pack(anchor=tk.W, pady=2)
+        
+        self.status_if_sys_var = tk.BooleanVar(value=self.config.get('status_if_sys', False))
+        ttk.Checkbutton(conditions_content, text="SysMSG is enabled", variable=self.status_if_sys_var,
+                       command=self.on_status_condition_changed).pack(anchor=tk.W, pady=2)
     
-    def get_spinbox_style(self):
-        """Получить стиль для spinbox в старом стиле"""
-        return """
-            QSpinBox {
-                background-color: #0a0a0a;
-                color: #d0d0d0;
-                border: 2px solid #444444;
-                border-radius: 2px;
-                padding: 4px 6px;
-                font-weight: normal;
-                font-size: 12px;
-            }
-            QSpinBox:focus {
-                border: 2px solid #6ba876;
-            }
-            QSpinBox::up-button, QSpinBox::down-button {
-                background-color: #2d2d2d;
-                border: 1px solid #444444;
-                width: 18px;
-            }
-            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-                background-color: #3a3a3a;
-            }
-        """
+    def create_time_tab(self, parent):
+        """Таб для времени"""
+        import datetime
+        import pytz
+        
+        scrollable_frame = self.create_scrollable_tab(parent)
+        
+        frame_inner = tk.Frame(scrollable_frame, bg=self.bg_primary)
+        frame_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        
+        self.show_time_var = tk.BooleanVar(value=self.config.get('show_time_msg', False))
+        ttk.Checkbutton(frame_inner, text="Show time in message", variable=self.show_time_var,
+                       command=self.on_show_time_changed).pack(anchor=tk.W, pady=(0, 12))
+        
+
+        
+        time_format_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        time_format_frame.pack(fill=tk.X, pady=(0, 12))
+        
+        self.create_gradient_line(time_format_frame, 2)
+        
+        time_format_label = tk.Label(time_format_frame, text="Time Format", fg=self.accent, bg=self.bg_secondary, 
+                                     font=("Consolas", 9, "bold"), padx=10, pady=6)
+        time_format_label.pack(anchor=tk.W)
+        
+        time_format_content = tk.Frame(time_format_frame, bg=self.bg_secondary)
+        time_format_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        self.time_format_var = tk.StringVar(value=self.config.get('time_format', 'auto'))
+        
+        ttk.Radiobutton(time_format_content, text="Auto (use PC time)", variable=self.time_format_var, 
+                       value="auto", command=self.on_time_format_changed).pack(anchor=tk.W, pady=2)
+        
+        custom_frame = tk.Frame(time_format_content, bg=self.bg_secondary)
+        custom_frame.pack(anchor=tk.W, pady=2)
+        ttk.Radiobutton(custom_frame, text="Custom time (HH:MM):", variable=self.time_format_var, 
+                       value="custom", command=self.on_time_format_changed).pack(side=tk.LEFT)
+        
+        self.time_custom_var = tk.StringVar(value=self.config.get('time_custom', ''))
+        self.time_start_offset: int = 0
+        time_entry = ttk.Entry(custom_frame, textvariable=self.time_custom_var, width=10)
+        time_entry.pack(side=tk.LEFT, padx=(8, 0))
+        time_entry.bind('<Return>', self.on_time_custom_enter)
+        
+        hint_label = tk.Label(custom_frame, text="(press Enter to start)", fg=self.text_secondary, 
+                             bg=self.bg_secondary, font=("Consolas", 7))
+        hint_label.pack(side=tk.LEFT, padx=(4, 0))
+        
+        self.time_custom_var.trace('w', lambda *args: self.on_time_format_changed())
+        
+        position_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        position_frame.pack(fill=tk.X, pady=(0, 12))
+        
+        position_border = tk.Frame(position_frame, bg=self.border, height=2)
+
+        
+        position_border.pack(fill=tk.X)
+
+        
+        self.create_gradient_line(position_frame, 2)
+
+        
+        self.create_gradient_line(position_frame, 2)
+        
+        position_label = tk.Label(position_frame, text="Message Position", fg=self.accent, bg=self.bg_secondary, 
+                                 font=("Consolas", 9, "bold"), padx=10, pady=6)
+        position_label.pack(anchor=tk.W)
+        
+        position_content = tk.Frame(position_frame, bg=self.bg_secondary)
+        position_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        self.time_position_var = tk.StringVar(value=self.config.get('time_position', 'at_end'))
+        positions = [
+            ("Before everything", "before_all"),
+            ("After MusicMSG", "after_music"),
+            ("After StatusMSG", "after_status"),
+            ("After SysMSG", "after_sys"),
+            ("At the end", "at_end"),
+        ]
+        
+        for text, value in positions:
+            ttk.Radiobutton(position_content, text=text, variable=self.time_position_var, 
+                           value=value, command=self.on_time_position_changed).pack(anchor=tk.W, pady=2)
     
-    @staticmethod
-    def lighten_color(color):
-        """Осветлить цвет"""
-        if color == "#6ba876":
-            return "#8bc994"
-        elif color == "#34C759":
-            return "#5FD878"
-        return color
+    def create_sys_tab(self, parent):
+        """Таб для системной информации"""
+        scrollable_frame = self.create_scrollable_tab(parent)
+        
+        frame_inner = tk.Frame(scrollable_frame, bg=self.bg_primary)
+        frame_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        
+        self.show_sys_var = tk.BooleanVar(value=self.config.get('show_sys_msg', False))
+        ttk.Checkbutton(frame_inner, text="Show system info in message", variable=self.show_sys_var,
+                       command=self.on_show_sys_changed).pack(anchor=tk.W, pady=(0, 12))
+        
+        sep_frame = tk.Frame(frame_inner, bg=self.bg_primary)
+        sep_frame.pack(fill=tk.X, pady=(0, 12))
+        ttk.Label(sep_frame, text="Message separator:").pack(side=tk.LEFT)
+        self.separator_var = tk.StringVar(value=self.config.get('sys_msg_separator', ' | '))
+        ttk.Entry(sep_frame, textvariable=self.separator_var, width=15).pack(side=tk.LEFT, padx=(8, 0))
+        self.separator_var.trace('w', lambda *args: self.on_separator_changed())
+        
+        display_frame = tk.Frame(frame_inner, bg=self.bg_secondary, relief=tk.FLAT, bd=0)
+        display_frame.pack(fill=tk.X)
+        
+        display_border = tk.Frame(display_frame, bg=self.border, height=2)
+
+        
+        display_border.pack(fill=tk.X)
+
+        
+        self.create_gradient_line(display_frame, 2)
+
+        
+        self.create_gradient_line(display_frame, 2)
+        
+        display_label = tk.Label(display_frame, text="What to Display", fg=self.accent, bg=self.bg_secondary, 
+                                font=("Consolas", 9, "bold"), padx=10, pady=6)
+        display_label.pack(anchor=tk.W)
+        
+        display_content = tk.Frame(display_frame, bg=self.bg_secondary)
+        display_content.pack(fill=tk.X, padx=8, pady=(0, 8))
+        
+        self.show_cpu_var = tk.BooleanVar(value=self.config.get('show_cpu_usage', True))
+        ttk.Checkbutton(display_content, text="CPU Usage", variable=self.show_cpu_var,
+                       command=self.on_cpu_usage_changed).pack(anchor=tk.W, pady=2)
+        
+        self.show_ram_var = tk.BooleanVar(value=self.config.get('show_ram_usage', True))
+        ttk.Checkbutton(display_content, text="RAM Usage", variable=self.show_ram_var,
+                       command=self.on_ram_usage_changed).pack(anchor=tk.W, pady=2)
+        
+        self.show_cpu_temp_var = tk.BooleanVar(value=self.config.get('show_cpu_temp', True))
+        ttk.Checkbutton(display_content, text="CPU Temperature", variable=self.show_cpu_temp_var,
+                       command=self.on_cpu_temp_changed).pack(anchor=tk.W, pady=2)
+        
+        self.show_gpu_temp_var = tk.BooleanVar(value=self.config.get('show_gpu_temp', True))
+        ttk.Checkbutton(display_content, text="GPU Temperature", variable=self.show_gpu_temp_var,
+                       command=self.on_gpu_temp_changed).pack(anchor=tk.W, pady=2)
     
-    @staticmethod
-    def darken_color(color):
-        """Затемнить цвет"""
-        if color == "#6ba876":
-            return "#4a6b54"
-        elif color == "#34C759":
-            return "#1FA940"
-        return color
+    def create_advanced_tab(self, parent):
+        """Таб для конфигурации"""
+        scrollable_frame = self.create_scrollable_tab(parent)
+        
+        frame_inner = tk.Frame(scrollable_frame, bg=self.bg_primary)
+        frame_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        
+        media_frame = tk.Frame(frame_inner, bg=self.bg_primary)
+        media_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(media_frame, text="MediaEngine URL:").pack(side=tk.LEFT)
+        self.media_url_var = tk.StringVar(value=self.config.get('media_engine_url', 'http://localhost:5000'))
+        ttk.Entry(media_frame, textvariable=self.media_url_var, width=35).pack(side=tk.LEFT, padx=(8, 0))
+        self.media_url_var.trace('w', lambda *args: self.on_media_url_changed())
+        
+        ip_frame = tk.Frame(frame_inner, bg=self.bg_primary)
+        ip_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(ip_frame, text="VRChat IP:").pack(side=tk.LEFT)
+        self.vrchat_ip_var = tk.StringVar(value=self.config.get('vrchat_ip', '127.0.0.1'))
+        ttk.Entry(ip_frame, textvariable=self.vrchat_ip_var, width=20).pack(side=tk.LEFT, padx=(8, 0))
+        self.vrchat_ip_var.trace('w', lambda *args: self.on_vrchat_ip_changed())
+        
+        port_frame = tk.Frame(frame_inner, bg=self.bg_primary)
+        port_frame.pack(fill=tk.X, pady=(0, 20))
+        ttk.Label(port_frame, text="VRChat Port:").pack(side=tk.LEFT)
+        self.vrchat_port_var = tk.StringVar(value=str(self.config.get('vrchat_port', 9000)))
+        ttk.Spinbox(port_frame, from_=1, to=65535, textvariable=self.vrchat_port_var, width=10).pack(side=tk.LEFT, padx=(8, 0))
+        self.vrchat_port_var.trace('w', lambda *args: self.on_vrchat_port_changed())
+        
+        sep = tk.Frame(frame_inner, height=2, bg=self.border)
+        sep.pack(fill=tk.X, pady=12)
+        self.create_gradient_line(frame_inner, 2)
+        
+        save_label = tk.Label(frame_inner, text="Configuration", fg=self.accent, bg=self.bg_primary, 
+                             font=("Consolas", 9, "bold"), padx=10, pady=6)
+        save_label.pack(anchor=tk.W)
+        
+        save_btn = tk.Button(frame_inner, text="Save All Settings to Config", 
+                            command=self.save_all_settings,
+                            bg=self.bg_secondary, fg=self.accent, 
+                            font=("Consolas", 9), relief=tk.FLAT, 
+                            padx=12, pady=8, cursor="hand2",
+                            activebackground=self.bg_tertiary, activeforeground=self.accent_light)
+        save_btn.pack(fill=tk.X, pady=(8, 0))
     
-    def create_music_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(10, 10, 10, 10)
+    def create_about_tab(self, parent):
+        """Таб информации о приложении"""
+        scrollable_frame = self.create_scrollable_tab(parent)
         
-        layout.addSpacing(20)
+        frame_inner = tk.Frame(scrollable_frame, bg=self.bg_primary)
+        frame_inner.pack(fill=tk.BOTH, expand=True)
         
-        # Формат сообщения
-        format_group = QGroupBox("Message Format")
-        format_group.setStyleSheet(self.get_groupbox_style())
-        format_layout = QVBoxLayout()
+        center_frame = tk.Frame(frame_inner, bg=self.bg_primary)
+        center_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20, anchor=tk.CENTER)
         
-        format_label = QLabel("Select format:")
-        format_font = QFont("Segoe UI", 10)
-        format_font.setStyleStrategy(QFont.PreferAntialias)
-        format_label.setFont(format_font)
-        format_layout.addWidget(format_label)
+        spacer1 = tk.Frame(center_frame, bg=self.bg_primary)
+        spacer1.pack(fill=tk.BOTH, expand=True)
         
-        self.format_combo = QComboBox()
-        self.format_combo.addItem("Display (from API)", "display")
-        self.format_combo.addItem("Artist - Track", "artist_track")
-        self.format_combo.addItem("Track - Artist", "track_artist")
-        self.format_combo.addItem("Track by Artist", "track_by_artist")
-        self.format_combo.addItem("Track only", "track_only")
+        content_frame = tk.Frame(center_frame, bg=self.bg_primary)
+        content_frame.pack(anchor=tk.CENTER, expand=False)
         
-        current_format = self.config.get('format', 'display')
-        index = self.format_combo.findData(current_format)
-        if index >= 0:
-            self.format_combo.setCurrentIndex(index)
+        icon_label = tk.Label(content_frame, text="🎵", font=("Arial", 48), bg=self.bg_primary, fg=self.accent)
+        icon_label.pack(pady=(0, 12))
         
-        self.format_combo.currentIndexChanged.connect(self.on_format_changed)
-        format_layout.addWidget(self.format_combo)
+        title_label = tk.Label(content_frame, text="SimpleChatbox", font=("Consolas", 18, "bold"), 
+                              bg=self.bg_primary, fg=self.accent)
+        title_label.pack()
         
-        format_group.setLayout(format_layout)
-        layout.addWidget(format_group)
+        version_label = tk.Label(content_frame, text="v0.0.1", font=("Consolas", 9), 
+                                bg=self.bg_primary, fg=self.accent_light)
+        version_label.pack()
         
-        layout.addSpacing(20)
+        desc_label = tk.Label(content_frame, text="VRChat Music Display Utility", 
+                             font=("Consolas", 9), bg=self.bg_primary, fg=self.text_secondary)
+        desc_label.pack(pady=(4, 16))
         
-        # Иконки статуса
-        icons_group = QGroupBox("Status Icons")
-        icons_group.setStyleSheet(self.get_groupbox_style())
-        icons_layout = QVBoxLayout()
-        icons_layout.setSpacing(10)
+        sep = tk.Frame(content_frame, height=2, bg=self.border)
+        sep.pack(fill=tk.X, pady=12, padx=20)
+        self.create_gradient_line(content_frame, 2)
         
-        self.show_icon_checkbox = QCheckBox("Show status icon")
-        self.show_icon_checkbox.setChecked(self.config.get('show_status_icon', True))
-        self.show_icon_checkbox.stateChanged.connect(self.on_show_icon_changed)
-        icons_layout.addWidget(self.show_icon_checkbox)
+        info_frame = tk.Frame(content_frame, bg=self.bg_primary)
+        info_frame.pack(fill=tk.X, pady=10, padx=20)
         
-        playing_layout = QHBoxLayout()
-        playing_label = QLabel("Playing icon:")
-        playing_label.setFont(QFont("Segoe UI", 10))
-        playing_layout.addWidget(playing_label)
-        self.playing_icon_input = QLineEdit()
-        self.playing_icon_input.setText(self.config.get('playing_icon', '▶'))
-        self.playing_icon_input.setMaxLength(5)
-        self.playing_icon_input.setMaximumWidth(100)
-        self.playing_icon_input.textChanged.connect(self.on_playing_icon_changed)
-        playing_layout.addWidget(self.playing_icon_input)
-        playing_layout.addStretch()
-        icons_layout.addLayout(playing_layout)
+        info_text = """Displays currently playing media from your PC
+in VRChat chatbox via OSC protocol.
+
+Integrates with warwakei Media Engine
+to fetch track information and system stats."""
         
-        paused_layout = QHBoxLayout()
-        paused_label = QLabel("Paused icon:")
-        paused_label.setFont(QFont("Segoe UI", 10))
-        paused_layout.addWidget(paused_label)
-        self.paused_icon_input = QLineEdit()
-        self.paused_icon_input.setText(self.config.get('paused_icon', '⏸'))
-        self.paused_icon_input.setMaxLength(5)
-        self.paused_icon_input.setMaximumWidth(100)
-        self.paused_icon_input.textChanged.connect(self.on_paused_icon_changed)
-        paused_layout.addWidget(self.paused_icon_input)
-        paused_layout.addStretch()
-        icons_layout.addLayout(paused_layout)
+        info_label = tk.Label(info_frame, text=info_text, font=("Consolas", 8),
+                             bg=self.bg_primary, fg=self.text_secondary, justify=tk.CENTER, wraplength=300)
+        info_label.pack()
         
-        icons_group.setLayout(icons_layout)
-        layout.addWidget(icons_group)
+        sep2 = tk.Frame(content_frame, height=2, bg=self.border)
+        sep2.pack(fill=tk.X, pady=12, padx=20)
+        self.create_gradient_line(content_frame, 2)
         
-        layout.addStretch()
-        widget.setLayout(layout)
-        return widget
-    
-    def create_sys_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(10, 10, 10, 10)
+        dev_label = tk.Label(content_frame, text="Developer", font=("Consolas", 8),
+                            bg=self.bg_primary, fg=self.text_secondary)
+        dev_label.pack(pady=(16, 0))
         
-        # Включить/выключить SysMSG
-        self.show_sys_checkbox = QCheckBox("Show system info in message")
-        self.show_sys_checkbox.setChecked(self.config.get('show_sys_msg', False))
-        self.show_sys_checkbox.stateChanged.connect(self.on_show_sys_changed)
-        layout.addWidget(self.show_sys_checkbox)
+        author_label = tk.Label(content_frame, text="warwakei", font=("Consolas", 11, "bold"),
+                               bg=self.bg_primary, fg=self.accent)
+        author_label.pack(pady=(2, 12))
         
-        layout.addSpacing(20)
-        
-        # Сепаратор
-        sep_layout = QHBoxLayout()
-        sep_label = QLabel("Message separator:")
-        sep_label.setFont(QFont("Segoe UI", 10))
-        sep_layout.addWidget(sep_label)
-        self.separator_input = QLineEdit()
-        self.separator_input.setText(self.config.get('sys_msg_separator', ' | '))
-        self.separator_input.setMaxLength(10)
-        self.separator_input.setMaximumWidth(150)
-        self.separator_input.textChanged.connect(self.on_separator_changed)
-        sep_layout.addWidget(self.separator_input)
-        sep_layout.addStretch()
-        layout.addLayout(sep_layout)
-        
-        layout.addSpacing(20)
-        
-        # Что показывать
-        display_group = QGroupBox("What to Display")
-        display_group.setStyleSheet(self.get_groupbox_style())
-        display_layout = QVBoxLayout()
-        display_layout.setSpacing(10)
-        
-        self.show_cpu_usage_checkbox = QCheckBox("CPU Usage")
-        self.show_cpu_usage_checkbox.setChecked(self.config.get('show_cpu_usage', True))
-        self.show_cpu_usage_checkbox.stateChanged.connect(self.on_cpu_usage_changed)
-        display_layout.addWidget(self.show_cpu_usage_checkbox)
-        
-        self.show_ram_usage_checkbox = QCheckBox("RAM Usage")
-        self.show_ram_usage_checkbox.setChecked(self.config.get('show_ram_usage', True))
-        self.show_ram_usage_checkbox.stateChanged.connect(self.on_ram_usage_changed)
-        display_layout.addWidget(self.show_ram_usage_checkbox)
-        
-        self.show_cpu_temp_checkbox = QCheckBox("CPU Temperature")
-        self.show_cpu_temp_checkbox.setChecked(self.config.get('show_cpu_temp', True))
-        self.show_cpu_temp_checkbox.stateChanged.connect(self.on_cpu_temp_changed)
-        display_layout.addWidget(self.show_cpu_temp_checkbox)
-        
-        self.show_gpu_temp_checkbox = QCheckBox("GPU Temperature")
-        self.show_gpu_temp_checkbox.setChecked(self.config.get('show_gpu_temp', True))
-        self.show_gpu_temp_checkbox.stateChanged.connect(self.on_gpu_temp_changed)
-        display_layout.addWidget(self.show_gpu_temp_checkbox)
-        
-        display_group.setLayout(display_layout)
-        layout.addWidget(display_group)
-        
-        layout.addStretch()
-        widget.setLayout(layout)
-        return widget
-    
-    def create_advanced_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(10, 10, 10, 10)
-        
-        # MediaEngine URL
-        media_layout = QHBoxLayout()
-        media_label = QLabel("MediaEngine URL:")
-        media_label.setFont(QFont("Segoe UI", 10))
-        media_layout.addWidget(media_label)
-        self.media_url_input = QLineEdit()
-        self.media_url_input.setText(self.config.get('media_engine_url', 'http://localhost:5000'))
-        self.media_url_input.textChanged.connect(self.on_media_url_changed)
-        media_layout.addWidget(self.media_url_input)
-        layout.addLayout(media_layout)
-        
-        # VRChat IP
-        ip_layout = QHBoxLayout()
-        ip_label = QLabel("VRChat IP:")
-        ip_label.setFont(QFont("Segoe UI", 10))
-        ip_layout.addWidget(ip_label)
-        self.vrchat_ip_input = QLineEdit()
-        self.vrchat_ip_input.setText(self.config.get('vrchat_ip', '127.0.0.1'))
-        self.vrchat_ip_input.textChanged.connect(self.on_vrchat_ip_changed)
-        ip_layout.addWidget(self.vrchat_ip_input)
-        layout.addLayout(ip_layout)
-        
-        # VRChat Port
-        port_layout = QHBoxLayout()
-        port_label = QLabel("VRChat Port:")
-        port_label.setFont(QFont("Segoe UI", 10))
-        port_layout.addWidget(port_label)
-        self.vrchat_port_input = QSpinBox()
-        self.vrchat_port_input.setMinimum(1)
-        self.vrchat_port_input.setMaximum(65535)
-        self.vrchat_port_input.setValue(self.config.get('vrchat_port', 9000))
-        self.vrchat_port_input.valueChanged.connect(self.on_vrchat_port_changed)
-        port_layout.addWidget(self.vrchat_port_input)
-        port_layout.addStretch()
-        layout.addLayout(port_layout)
-        
-        layout.addStretch()
-        widget.setLayout(layout)
-        return widget
-    
-    def create_about_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
-        layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Логотип/Иконка
-        icon_label = QLabel("🎵")
-        icon_font = QFont("Arial", 40)
-        icon_label.setFont(icon_font)
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
-        
-        # Название и версия
-        title_label = QLabel("SimpleChatbox")
-        title_font = QFont("Segoe UI", 16, QFont.Bold)
-        title_font.setStyleStrategy(QFont.PreferAntialias)
-        title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #6ba876;")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
-        
-        version_label = QLabel("Version 0.0.1")
-        version_font = QFont("Segoe UI", 10)
-        version_font.setStyleStrategy(QFont.PreferAntialias)
-        version_label.setFont(version_font)
-        version_label.setStyleSheet("color: #8bc994;")
-        version_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(version_label)
-        
-        layout.addSpacing(5)
-        
-        # Описание
-        desc_label = QLabel("VRChat Music Display Utility")
-        desc_font = QFont("Segoe UI", 9)
-        desc_font.setStyleStrategy(QFont.PreferAntialias)
-        desc_label.setFont(desc_font)
-        desc_label.setStyleSheet("color: #a0a0a0;")
-        desc_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(desc_label)
-        
-        layout.addSpacing(10)
-        
-        # Автор
-        author_group = QGroupBox("Developer")
-        author_group.setStyleSheet(self.get_groupbox_style())
-        author_layout = QVBoxLayout()
-        author_layout.setSpacing(4)
-        author_layout.setContentsMargins(8, 8, 8, 8)
-        
-        author_name = QLabel("warwakei")
-        author_font = QFont("Segoe UI", 10, QFont.Bold)
-        author_font.setStyleStrategy(QFont.PreferAntialias)
-        author_name.setFont(author_font)
-        author_name.setStyleSheet("color: #6ba876;")
-        author_layout.addWidget(author_name)
-        
-        author_group.setLayout(author_layout)
-        layout.addWidget(author_group)
-        
-        # Ссылки
-        links_group = QGroupBox("Resources")
-        links_group.setStyleSheet(self.get_groupbox_style())
-        links_layout = QVBoxLayout()
-        links_layout.setSpacing(6)
-        links_layout.setContentsMargins(8, 8, 8, 8)
+        links_frame = tk.Frame(content_frame, bg=self.bg_primary)
+        links_frame.pack(fill=tk.X, pady=8, padx=20)
         
         links = [
             ("GitHub Profile", "https://github.com/warwakei"),
@@ -619,207 +619,337 @@ class SimpleChatboxApp(QMainWindow):
             ("SimpleChatbox", "https://github.com/warwakei/SimpleChatbox")
         ]
         
-        for link_name, link_url in links:
-            link_button = QPushButton(f"→ {link_name}")
-            link_button.setStyleSheet(self.get_link_button_style())
-            link_button.setCursor(Qt.PointingHandCursor)
-            link_button.setMaximumHeight(28)
-            link_button.clicked.connect(lambda checked, url=link_url: self.open_link(url))
-            links_layout.addWidget(link_button)
+        for text, url in links:
+            btn = tk.Button(links_frame, text=f"→ {text}", 
+                           command=lambda u=url: self.open_link(u),
+                           bg=self.bg_secondary, fg=self.accent, 
+                           font=("Consolas", 8), relief=tk.FLAT, 
+                           padx=10, pady=5, cursor="hand2",
+                           activebackground=self.bg_tertiary, activeforeground=self.accent_light,
+                           bd=2, highlightthickness=0, highlightcolor=self.border)
+            btn.pack(fill=tk.X, pady=2)
         
-        links_group.setLayout(links_layout)
-        layout.addWidget(links_group)
+        sep3 = tk.Frame(content_frame, height=2, bg=self.border)
+        sep3.pack(fill=tk.X, pady=12)
+        self.create_gradient_line(content_frame, 2)
         
-        layout.addStretch()
-        widget.setLayout(layout)
-        return widget
+        license_label = tk.Label(content_frame, text="MIT License", font=("Consolas", 7),
+                                bg=self.bg_primary, fg=self.text_secondary)
+        license_label.pack()
+        
+        spacer2 = tk.Frame(center_frame, bg=self.bg_primary)
+        spacer2.pack(fill=tk.BOTH, expand=True)
     
     def open_link(self, url):
         """Открыть ссылку в браузере"""
         import webbrowser
         webbrowser.open(url)
     
-    def get_link_button_style(self):
-        """Получить стиль для кнопки ссылки в старом стиле"""
-        return """
-            QPushButton {
-                background-color: #0a0a0a;
-                color: #6ba876;
-                border: 2px solid #444444;
-                border-radius: 2px;
-                padding: 8px 12px;
-                font-weight: normal;
-                font-size: 12px;
-                text-align: left;
-            }
-            QPushButton:hover {
-                background-color: #1a1a1a;
-                border: 2px solid #666666;
-            }
-            QPushButton:pressed {
-                background-color: #0a0a0a;
-                border: 2px solid #222222;
-            }
-        """
+    def setup_timers(self):
+        """Настроить таймеры"""
+        self.check_timer()
+        self.auto_timer()
     
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_connection)
-        self.timer.start(1000)
-        
-        self.auto_timer = QTimer()
-        self.auto_timer.timeout.connect(self.auto_send_track)
+    def check_timer(self):
+        """Проверить подключение каждую секунду"""
+        self.check_connection()
+        self.root.after(1000, self.check_timer)
+    
+    def auto_timer(self):
+        """Таймер для автоотправки"""
+        if self.auto_send_enabled:
+            self.auto_send_track()
+        self.root.after(100, self.auto_timer)
     
     def check_connection(self):
         """Проверить подключение к MediaEngine"""
-        status = self.media_client.get_status()
-        if status:
-            self.signals.status_changed.emit("✓ Connected to MediaEngine")
-            self.refresh_track()
-        else:
-            self.signals.status_changed.emit("✗ Cannot connect to MediaEngine")
+        def check():
+            status = self.media_client.get_status()
+            if status:
+                self.status_label.config(text="✓ Connected to MediaEngine", fg=self.accent)
+                self.refresh_track()
+            else:
+                self.status_label.config(text="✗ Cannot connect to MediaEngine", fg=self.accent_light)
+        
+        threading.Thread(target=check, daemon=True).start()
     
     def refresh_track(self):
         """Обновить информацию о треке"""
-        track = self.media_client.get_current_track()
-        if track:
-            self.signals.track_updated.emit(track)
-            # Обновляем системную информацию при обновлении трека
-            if self.show_sys_checkbox.isChecked():
-                sys_msg = self.system_info.format_sys_message(self.config)
-                self.sys_label.setText(sys_msg)
+        def fetch():
+            track = self.media_client.get_current_track()
+            if track:
+                self.on_track_updated(track)
+        
+        threading.Thread(target=fetch, daemon=True).start()
     
     def on_track_updated(self, track):
+        """Обновить отображение трека"""
         self.current_track = track
-        message = self.vrchat.format_track_message(track, self.config)
-        is_paused = track.get('isPaused', False)
-        status = "PAUSED" if is_paused else "PLAYING"
-        self.track_label.setText(f"{status}\n{message}")
+        self.update_preview()
     
-    def on_status_changed(self, status):
-        self.status_label.setText(status)
+    def update_preview(self):
+        """Обновить preview с точным сообщением для VRChat"""
+        import datetime
+        
+        if not self.current_track:
+            self.track_label.config(text="No track playing")
+            return
+        
+        parts = []
+        
+        if self.status_position_var.get() == "before_all" and self.show_status_var.get() and self._check_status_conditions():
+            parts.append(self.status_msg_var.get())
+        
+        if self.time_position_var.get() == "before_all" and self.show_time_var.get():
+            parts.append(self._get_time_string())
+        
+        music_msg = self.vrchat.format_track_message(self.current_track, self.config)
+        parts.append(music_msg)
+        
+        if self.status_position_var.get() == "after_music" and self.show_status_var.get() and self._check_status_conditions():
+            parts.append(self.status_msg_var.get())
+        
+        if self.time_position_var.get() == "after_music" and self.show_time_var.get():
+            parts.append(self._get_time_string())
+        
+        if self.time_position_var.get() == "after_status" and self.show_time_var.get():
+            parts.append(self._get_time_string())
+        
+        if self.show_sys_var.get():
+            sys_msg = self.system_info.format_sys_message(self.config)
+            parts.append(sys_msg)
+        
+        if self.status_position_var.get() == "after_sys" and self.show_status_var.get() and self._check_status_conditions():
+            parts.append(self.status_msg_var.get())
+        
+        if self.time_position_var.get() == "after_sys" and self.show_time_var.get():
+            parts.append(self._get_time_string())
+        
+        if self.status_position_var.get() == "at_end" and self.show_status_var.get() and self._check_status_conditions():
+            parts.append(self.status_msg_var.get())
+        
+        if self.time_position_var.get() == "at_end" and self.show_time_var.get():
+            parts.append(self._get_time_string())
+        
+        full_message = " | ".join(parts)
+        self.track_label.config(text=full_message)
+        self._animate_preview()
+    
+    def _animate_preview(self):
+        """Анимация обновления preview"""
+        original_fg = self.track_label.cget("foreground")
+        self.track_label.config(foreground=self.accent_light)
+        self.root.after(150, lambda: self.track_label.config(foreground=original_fg))
+    
+    def _get_time_string(self) -> str:
+        """Получить строку времени"""
+        import datetime
+        
+        time_format = self.time_format_var.get()
+        
+        if time_format == "custom":
+            custom_time = self.time_custom_var.get().strip()
+            if custom_time and ':' in custom_time:
+                try:
+                    start_h, start_m = map(int, custom_time.split(':'))
+                    current_time = datetime.datetime.now()
+                    elapsed = (current_time - self.time_start_time).total_seconds() if hasattr(self, 'time_start_time') else 0
+                    
+                    total_minutes = start_h * 60 + start_m + int(elapsed // 60)
+                    hours = (total_minutes // 60) % 24
+                    minutes = total_minutes % 60
+                    return f"{hours:02d}:{minutes:02d}"
+                except (ValueError, AttributeError):
+                    return custom_time
+        
+        return datetime.datetime.now().strftime('%H:%M')
+    
+    def _check_status_conditions(self) -> bool:
+        """Проверить условия для показа StatusMSG"""
+        if self.status_if_music_var.get() and not hasattr(self, 'current_track'):
+            return False
+        if self.status_if_sys_var.get() and not self.show_sys_var.get():
+            return False
+        return True
     
     def send_to_vrchat(self):
         """Отправить текущий трек в VRChat"""
         if self.current_track:
             message = self.vrchat.format_track_message(self.current_track, self.config)
             
-            # Добавить системную информацию если включено
-            if self.show_sys_checkbox.isChecked():
+            if self.show_sys_var.get():
                 sys_msg = self.system_info.format_sys_message(self.config)
                 separator = self.config.get('sys_msg_separator', ' | ')
                 message = f"{message}{separator}{sys_msg}"
             
             if self.vrchat.send_message(message):
-                self.status_label.setText("✓ Sent to VRChat")
+                self.status_label.config(text="✓ Sent to VRChat", fg=self.accent)
             else:
-                self.status_label.setText("✗ Failed to send to VRChat")
+                self.status_label.config(text="✗ Failed to send to VRChat", fg=self.accent_light)
     
-    def toggle_auto_send(self, state):
+    def toggle_auto_send(self):
         """Включить/выключить автоотправку"""
-        if state:
-            delay = self.delay_spinbox.value()
-            self.auto_timer.start(delay)
-            self.auto_send_enabled = True
-        else:
-            self.auto_timer.stop()
-            self.auto_send_enabled = False
+        self.auto_send_enabled = self.auto_send_var.get()
     
     def auto_send_track(self):
         """Автоматически отправить трек"""
-        self.refresh_track()
-        if self.current_track:
-            self.send_to_vrchat()
+        if self.auto_send_enabled:
+            self.refresh_track()
+            if self.current_track:
+                self.send_to_vrchat()
     
     def on_format_changed(self):
-        """Изменение формата сообщения"""
-        format_type = self.format_combo.currentData()
-        self.config.set('format', format_type)
-        self.refresh_track()
+        self.config.set('format', self.format_var.get())
+        self.update_preview()
     
     def on_show_icon_changed(self):
-        """Изменение показа иконки"""
-        show = self.show_icon_checkbox.isChecked()
-        self.config.set('show_status_icon', show)
-        self.refresh_track()
+        self.config.set('show_status_icon', self.show_icon_var.get())
+        self.update_preview()
     
     def on_playing_icon_changed(self):
-        """Изменение иконки воспроизведения"""
-        icon = self.playing_icon_input.text()
-        self.config.set('playing_icon', icon)
-        self.refresh_track()
+        self.config.set('playing_icon', self.playing_icon_var.get())
+        self.update_preview()
     
     def on_paused_icon_changed(self):
-        """Изменение иконки паузы"""
-        icon = self.paused_icon_input.text()
-        self.config.set('paused_icon', icon)
-        self.refresh_track()
+        self.config.set('paused_icon', self.paused_icon_var.get())
+        self.update_preview()
     
     def on_show_sys_changed(self):
-        """Изменение показа системной информации"""
-        show = self.show_sys_checkbox.isChecked()
-        self.config.set('show_sys_msg', show)
-        self.refresh_track()
+        self.config.set('show_sys_msg', self.show_sys_var.get())
+        self.update_preview()
     
     def on_separator_changed(self):
-        """Изменение сепаратора"""
-        sep = self.separator_input.text()
-        self.config.set('sys_msg_separator', sep)
+        self.config.set('sys_msg_separator', self.separator_var.get())
+        self.update_preview()
     
     def on_cpu_usage_changed(self):
-        """Изменение показа CPU Usage"""
-        show = self.show_cpu_usage_checkbox.isChecked()
-        self.config.set('show_cpu_usage', show)
-        self.refresh_track()
+        self.config.set('show_cpu_usage', self.show_cpu_var.get())
+        self.update_preview()
     
     def on_ram_usage_changed(self):
-        """Изменение показа RAM Usage"""
-        show = self.show_ram_usage_checkbox.isChecked()
-        self.config.set('show_ram_usage', show)
-        self.refresh_track()
+        self.config.set('show_ram_usage', self.show_ram_var.get())
+        self.update_preview()
     
     def on_cpu_temp_changed(self):
-        """Изменение показа CPU Temperature"""
-        show = self.show_cpu_temp_checkbox.isChecked()
-        self.config.set('show_cpu_temp', show)
-        self.refresh_track()
+        self.config.set('show_cpu_temp', self.show_cpu_temp_var.get())
+        self.update_preview()
     
     def on_gpu_temp_changed(self):
-        """Изменение показа GPU Temperature"""
-        show = self.show_gpu_temp_checkbox.isChecked()
-        self.config.set('show_gpu_temp', show)
-        self.refresh_track()
+        self.config.set('show_gpu_temp', self.show_gpu_temp_var.get())
+        self.update_preview()
+    
+    def on_show_status_changed(self):
+        self.config.set('show_status_msg', self.show_status_var.get())
+        self.update_preview()
+    
+    def on_status_msg_changed(self):
+        self.config.set('status_msg', self.status_msg_var.get())
+        self.update_preview()
+    
+    def on_status_position_changed(self):
+        self.config.set('status_position', self.status_position_var.get())
+        self.update_preview()
+    
+    def on_status_sep_changed(self):
+        self.config.set('status_sep_before', self.status_sep_before_var.get())
+        self.config.set('status_sep_after', self.status_sep_after_var.get())
+        self.update_preview()
+    
+    def on_status_condition_changed(self):
+        self.config.set('status_if_music', self.status_if_music_var.get())
+        self.config.set('status_if_sys', self.status_if_sys_var.get())
+        self.update_preview()
+    
+    def on_show_time_changed(self):
+        self.config.set('show_time_msg', self.show_time_var.get())
+        self.update_preview()
+    
+    
+    
+    def on_time_format_changed(self):
+        self.config.set('time_format', self.time_format_var.get())
+        if self.time_format_var.get() == 'custom':
+            self.config.set('time_custom', self.time_custom_var.get())
+        self.update_preview()
+    
+    def on_time_custom_enter(self, event) -> None:
+        """Начать отсчёт времени с введённого значения"""
+        import datetime
+        custom_time = self.time_custom_var.get().strip()
+        if custom_time and ':' in custom_time:
+            try:
+                h, m = map(int, custom_time.split(':'))
+                if 0 <= h < 24 and 0 <= m < 60:
+                    self.time_start_time = datetime.datetime.now()
+                    self.time_format_var.set('custom')
+                    self.update_preview()
+            except ValueError:
+                pass
+    
+    def on_time_position_changed(self):
+        self.config.set('time_position', self.time_position_var.get())
+        self.update_preview()
+    
+    def on_time_sep_changed(self):
+        self.config.set('time_sep_before', self.time_sep_before_var.get())
+        self.config.set('time_sep_after', self.time_sep_after_var.get())
+        self.update_preview()
     
     def on_media_url_changed(self):
-        """Изменение URL MediaEngine"""
-        url = self.media_url_input.text()
-        self.config.set('media_engine_url', url)
-        self.media_client = MediaEngineClient(url)
+        self.config.set('media_engine_url', self.media_url_var.get())
+        self.media_client = MediaEngineClient(self.media_url_var.get())
     
     def on_vrchat_ip_changed(self):
-        """Изменение IP VRChat"""
-        ip = self.vrchat_ip_input.text()
-        self.config.set('vrchat_ip', ip)
-        self.vrchat = VRChatChatbox(ip=ip, port=self.config.get('vrchat_port'))
+        self.config.set('vrchat_ip', self.vrchat_ip_var.get())
+        self.vrchat = VRChatChatbox(self.vrchat_ip_var.get(), int(self.vrchat_port_var.get()))
     
     def on_vrchat_port_changed(self):
-        """Изменение порта VRChat"""
-        port = self.vrchat_port_input.value()
-        self.config.set('vrchat_port', port)
-        self.vrchat = VRChatChatbox(ip=self.config.get('vrchat_ip'), port=port)
-    
-    def setup_timer(self):
-        """Настройка таймера для обновления информации"""
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.refresh_track)
-        self.timer.start(1000)  # Обновление каждую секунду
+        try:
+            port = int(self.vrchat_port_var.get())
+            self.config.set('vrchat_port', port)
+            self.vrchat = VRChatChatbox(self.vrchat_ip_var.get(), port)
+        except ValueError:
+            pass
+
+    def save_all_settings(self) -> None:
+        """Сохранить все текущие настройки в конфиг"""
+        settings = {
+            'format': self.format_var.get(),
+            'show_status_icon': self.show_icon_var.get(),
+            'playing_icon': self.playing_icon_var.get(),
+            'paused_icon': self.paused_icon_var.get(),
+            'show_status_msg': self.show_status_var.get(),
+            'status_msg': self.status_msg_var.get(),
+            'status_position': self.status_position_var.get(),
+            'show_time_msg': self.show_time_var.get(),
+            'time_format': self.time_format_var.get(),
+            'time_custom': self.time_custom_var.get(),
+            'time_position': self.time_position_var.get(),
+            'show_sys_msg': self.show_sys_var.get(),
+            'sys_msg_separator': self.separator_var.get(),
+            'show_cpu_usage': self.show_cpu_var.get(),
+            'show_ram_usage': self.show_ram_var.get(),
+            'show_cpu_temp': self.show_cpu_temp_var.get(),
+            'show_gpu_temp': self.show_gpu_temp_var.get(),
+            'media_engine_url': self.media_url_var.get(),
+            'vrchat_ip': self.vrchat_ip_var.get(),
+            'vrchat_port': int(self.vrchat_port_var.get()),
+        }
+        
+        for key, value in settings.items():
+            self.config.set(key, value)
+
 
 
 def main():
-    app = QApplication(sys.argv)
-    window = SimpleChatboxApp()
-    window.show()
-    sys.exit(app.exec_())
+    root = tk.Tk()
+    app = SimpleChatboxApp(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
