@@ -573,7 +573,7 @@ class SimpleChatboxApp:
                               bg=self.bg_primary, fg=self.accent)
         title_label.pack()
         
-        version_label = tk.Label(content_frame, text="v0.0.1", font=("Consolas", 9), 
+        version_label = tk.Label(content_frame, text="v0.0.2", font=("Consolas", 9), 
                                 bg=self.bg_primary, fg=self.accent_light)
         version_label.pack()
         
