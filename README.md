@@ -19,6 +19,15 @@ Integrates with [warwakei Media Engine](https://github.com/warwakei/MediaEngine)
 - Persistent configuration storage
 - Combine music and system info in one message
 
+## What's New in v0.0.2
+
+- **Time Display (TimeMSG)**: Show current time or custom time with auto-increment in messages
+- **Status Message (StatusMSG)**: Add custom status messages with flexible positioning
+- **Improved UI**: Better tab organization with CFG tab for configuration management
+- **Save All Settings**: One-click button to save all current settings to config
+- **Enhanced Button Styling**: Better visibility on hover with accent color highlighting
+- **Simplified Time Controls**: Auto PC time or custom time with Enter-to-start functionality
+
 ## Requirements
 
 - Windows 10 or later
